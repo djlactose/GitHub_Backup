@@ -8,7 +8,7 @@ COPY backup.sh /usr/local/bin/backup.sh
 COPY backup.cron /etc/crontabs/root
 COPY entrypoint.sh /entrypoint.sh
 
-RUN apk add --no-cache git curl jq cron && \
+RUN apk add --no-cache git curl jq dcron && \
 mkdir -p /backup /var/log && \
 chmod +x /usr/local/bin/backup.sh && \
 chmod +x /entrypoint.sh
