@@ -19,20 +19,27 @@ fi
 page=1
 while true; do
     echo "Fetching repositories (page $page)..."
-    # Append the page parameter to the API URL
+    # Fetch the current page of repositories
     if [ -n "$AUTH_HEADER" ]; then
         REPOS_JSON=$(curl -s -H "$AUTH_HEADER" "${API_URL}&page=${page}")
     else
         REPOS_JSON=$(curl -s "${API_URL}&page=${page}")
     fi
 
-    # If the response is empty or an empty array, we have reached the last page
-    if [ -z "$REPOS_JSON" ] || [ "$REPOS_JSON" = "[]" ]; then
-        echo "No more repositories found on page $page. Exiting loop."
+    # If the response is completely empty, exit the loop
+    if [ -z "$REPOS_JSON" ]; then
+        echo "Empty response on page $page. Exiting loop."
         break
     fi
 
-    # Process each repository in the current page
+    # Use jq to determine the number of repositories in the response
+    repo_count=$(echo "$REPOS_JSON" | jq 'length')
+    if [ "$repo_count" -eq 0 ]; then
+        echo "No repositories found on page $page. Exiting loop."
+        break
+    fi
+
+    # Process each repository returned on this page
     echo "$REPOS_JSON" | jq -r '.[] | "\(.full_name) \(.clone_url)"' | while read full_name clone_url; do
         # Extract owner and repo name from full_name
         owner=$(echo "$full_name" | cut -d'/' -f1)
@@ -61,7 +68,7 @@ while true; do
         fi
     done
 
-    # Move to the next page
+    # Increment page number for the next iteration
     page=$((page + 1))
 done
 
