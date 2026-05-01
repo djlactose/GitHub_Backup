@@ -1,18 +1,27 @@
-FROM alpine:latest
+FROM alpine:3.21
 
 VOLUME ["/backup"]
 ENV GITHUB_USER=
 ENV GITHUB_TOKEN=
 ENV BACKUP_HOUR=2
+ENV RUN_AT_STARTUP=0
+ENV SKIP_FORKS=0
+ENV SKIP_ARCHIVED=0
+ENV GITHUB_ORGS=
 
 COPY backup.sh /usr/local/bin/backup.sh
-COPY backup.cron /etc/crontabs/root
 COPY entrypoint.sh /entrypoint.sh
 
-RUN apk add --no-cache git curl jq dcron && \
-mkdir -p /backup /var/log && \
-chmod +x /usr/local/bin/backup.sh && \
-chmod +x /entrypoint.sh
+RUN apk add --no-cache git curl jq dcron tini && \
+    addgroup -g 1000 backup && \
+    adduser -D -u 1000 -G backup -h /home/backup -s /bin/sh backup && \
+    mkdir -p /backup /etc/crontabs && \
+    chown -R backup:backup /backup /etc/crontabs && \
+    chmod +x /usr/local/bin/backup.sh /entrypoint.sh
 
-# Use the entrypoint script to start cron and keep the container running
-ENTRYPOINT ["/entrypoint.sh"]
+USER backup
+
+HEALTHCHECK --interval=5m --timeout=10s --start-period=10s \
+    CMD pgrep crond >/dev/null || exit 1
+
+ENTRYPOINT ["/sbin/tini", "--", "/entrypoint.sh"]
