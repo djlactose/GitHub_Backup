@@ -89,8 +89,8 @@ The workflow can also be triggered manually via the **Run workflow** button (`wo
 
 ## Project Structure
 
-- **`Dockerfile`** — Alpine 3.21 base, installs `git curl jq dcron tini`, creates the non-root `backup` user, sets the `HEALTHCHECK`, and runs `tini -- /entrypoint.sh`.
-- **`entrypoint.sh`** — Writes `/etc/crontabs/<user>` from `BACKUP_HOUR`, optionally kicks off an immediate backup when `RUN_AT_STARTUP=1`, then `exec`s `crond -f -l 8`.
+- **`Dockerfile`** — Alpine 3.21 base, installs `git curl jq tini` (cron is BusyBox's built-in `crond`, which runs cleanly as non-root), creates the `backup` user, sets the `HEALTHCHECK`, and runs `tini -- /entrypoint.sh`.
+- **`entrypoint.sh`** — Writes `/etc/crontabs/<user>` from `BACKUP_HOUR`, optionally kicks off an immediate backup when `RUN_AT_STARTUP=1`, then `exec`s `/bin/busybox crond -f -l 8 -c /etc/crontabs`.
 - **`backup.sh`** — Iterates the user's repos and (optionally) each org's repos, applies `SKIP_*` filters, and mirror-clones or updates each into `/backup/<owner>/<repo>.git`.
 - **`.github/workflows/docker-build.yml`** — CI build & push.
 - **`docker_build.ps1`** — Local Windows helper for ad-hoc dev pushes.

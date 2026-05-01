@@ -18,7 +18,8 @@ if [ "$HOUR" -lt 0 ] || [ "$HOUR" -gt 23 ]; then
     exit 1
 fi
 
-# crond (dcron) reads /etc/crontabs/<running-user> for non-root invocations.
+# BusyBox crond reads /etc/crontabs/<running-user> when invoked as non-root
+# with -c /etc/crontabs.
 USER_NAME=$(id -un)
 mkdir -p /etc/crontabs
 echo "0 $HOUR * * * /usr/local/bin/backup.sh > /proc/1/fd/1 2>/proc/1/fd/2" > "/etc/crontabs/$USER_NAME"
@@ -29,4 +30,4 @@ if [ "${RUN_AT_STARTUP:-0}" = "1" ]; then
     /usr/local/bin/backup.sh &
 fi
 
-exec crond -f -l 8
+exec /bin/busybox crond -f -l 8 -c /etc/crontabs
