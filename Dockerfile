@@ -12,7 +12,7 @@ ENV GITHUB_ORGS=
 COPY backup.sh /usr/local/bin/backup.sh
 COPY entrypoint.sh /entrypoint.sh
 
-RUN apk add --no-cache git curl jq tini && \
+RUN apk add --no-cache git curl jq tini tzdata && \
     addgroup -g 1000 backup && \
     adduser -D -u 1000 -G backup -h /home/backup -s /bin/sh backup && \
     mkdir -p /backup /etc/crontabs && \
