@@ -16,7 +16,7 @@ The published image is available on Docker Hub at [`djlactose/github_backup`](ht
 
 ## Features
 
-- **Automated Daily Backups:** The entrypoint generates a per-user crontab from `BACKUP_HOUR` and execs `crond`. Cron job stdout/stderr is wired to the container's stdout, so `docker logs` shows backup output without an unbounded log file.
+- **Automated Daily Backups:** The entrypoint runs a tiny sleep-based scheduler that fires `backup.sh` once per day at `BACKUP_HOUR` (container time). No cron daemon is involved, so the container runs cleanly as a non-root user. Output goes straight to the container's stdout, so `docker logs` shows backup output without an unbounded log file.
 - **Mirror Cloning:** Uses `git clone --mirror` to preserve all refs (branches, tags, notes).
 - **Pagination & Filters:** Iterates the GitHub API across all pages and supports `SKIP_FORKS` / `SKIP_ARCHIVED` filters.
 - **User and Org Targets:** Backs up the authenticated user's repos and/or any number of orgs listed in `GITHUB_ORGS`.
@@ -89,8 +89,8 @@ The workflow can also be triggered manually via the **Run workflow** button (`wo
 
 ## Project Structure
 
-- **`Dockerfile`** — Alpine 3.21 base, installs `git curl jq tini` (cron is BusyBox's built-in `crond`, which runs cleanly as non-root), creates the `backup` user, sets the `HEALTHCHECK`, and runs `tini -- /entrypoint.sh`.
-- **`entrypoint.sh`** — Writes `/etc/crontabs/<user>` from `BACKUP_HOUR`, optionally kicks off an immediate backup when `RUN_AT_STARTUP=1`, then `exec`s `/bin/busybox crond -f -l 8 -c /etc/crontabs`.
+- **`Dockerfile`** — Alpine 3.21 base, installs `git curl jq tini`, creates the non-root `backup` user, sets the `HEALTHCHECK`, and runs `tini -- /entrypoint.sh`.
+- **`entrypoint.sh`** — Validates `BACKUP_HOUR`, optionally fires an immediate backup when `RUN_AT_STARTUP=1`, then enters a sleep loop that wakes once per day at the configured hour and invokes `backup.sh`.
 - **`backup.sh`** — Iterates the user's repos and (optionally) each org's repos, applies `SKIP_*` filters, and mirror-clones or updates each into `/backup/<owner>/<repo>.git`.
 - **`.github/workflows/docker-build.yml`** — CI build & push.
 - **`docker_build.ps1`** — Local Windows helper for ad-hoc dev pushes.

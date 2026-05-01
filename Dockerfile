@@ -22,6 +22,6 @@ RUN apk add --no-cache git curl jq tini && \
 USER backup
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD pgrep crond >/dev/null || exit 1
+    CMD pgrep -f entrypoint.sh >/dev/null || exit 1
 
 ENTRYPOINT ["/sbin/tini", "--", "/entrypoint.sh"]

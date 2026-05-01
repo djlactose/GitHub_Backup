@@ -1,8 +1,10 @@
 #!/bin/sh
-# entrypoint.sh - generate the crontab from BACKUP_HOUR, optionally run an
-# immediate backup, then hand off to crond. Cron job stdout/stderr is wired
-# straight to PID 1's fds so `docker logs` shows backup output without a
-# log file that would grow without bound.
+# entrypoint.sh - Sleep-based daily scheduler. Runs backup.sh once per day at
+# BACKUP_HOUR (container time), with optional immediate run at startup.
+#
+# We deliberately do not use a cron daemon: dcron's crond is not executable
+# by non-root users, and crond is not built into Alpine's base BusyBox. A
+# tiny shell loop is reliable, runs as any user, and tini handles signals.
 set -eu
 
 HOUR=${BACKUP_HOUR:-2}
@@ -18,16 +20,24 @@ if [ "$HOUR" -lt 0 ] || [ "$HOUR" -gt 23 ]; then
     exit 1
 fi
 
-# BusyBox crond reads /etc/crontabs/<running-user> when invoked as non-root
-# with -c /etc/crontabs.
 USER_NAME=$(id -un)
-mkdir -p /etc/crontabs
-echo "0 $HOUR * * * /usr/local/bin/backup.sh > /proc/1/fd/1 2>/proc/1/fd/2" > "/etc/crontabs/$USER_NAME"
 echo "Scheduled daily backup at ${HOUR}:00 (container time, user=$USER_NAME)."
 
 if [ "${RUN_AT_STARTUP:-0}" = "1" ]; then
-    echo "RUN_AT_STARTUP=1 - running an immediate backup in the background."
-    /usr/local/bin/backup.sh &
+    echo "RUN_AT_STARTUP=1 - running an immediate backup."
+    /usr/local/bin/backup.sh || echo "Initial backup completed with errors." >&2
 fi
 
-exec /bin/busybox crond -f -l 8 -c /etc/crontabs
+HOUR_SECS=$((HOUR * 3600))
+while true; do
+    now=$(date +%s)
+    sec_today=$((now % 86400))
+    if [ "$sec_today" -lt "$HOUR_SECS" ]; then
+        sleep_for=$((HOUR_SECS - sec_today))
+    else
+        sleep_for=$((86400 - sec_today + HOUR_SECS))
+    fi
+    echo "Next backup in ${sleep_for}s (now: $(date '+%Y-%m-%d %H:%M:%S %Z'))."
+    sleep "$sleep_for"
+    /usr/local/bin/backup.sh || echo "Backup completed with errors." >&2
+done
